@@ -173,6 +173,119 @@
         font-size: 13px;
       }
     }
+
+
+    /* Pop-up de saída: não interfere no layout nem no player. */
+    .exit-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .88);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+    }
+
+    .exit-overlay.is-visible { display: flex; }
+
+    .exit-dialog {
+      width: 100%;
+      max-width: 490px;
+      max-height: calc(100dvh - 40px);
+      overflow: auto;
+      position: relative;
+      text-align: center;
+      padding: 38px 30px 27px;
+      color: #fff;
+      background: linear-gradient(165deg, #252525 0%, #111 72%);
+      border: 1px solid #555;
+      border-top: 4px solid #e93643;
+      border-radius: 18px;
+      box-shadow: 0 24px 90px rgba(0, 0, 0, .8);
+      animation: exitAppear .22s ease-out;
+      font-family: Arial, sans-serif;
+    }
+
+    @keyframes exitAppear {
+      from { transform: translateY(14px) scale(.98); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .exit-kicker {
+      display: block;
+      margin-bottom: 13px;
+      color: #ff858a;
+      font-size: 12px;
+      letter-spacing: .16em;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .exit-title {
+      margin: 0 0 16px;
+      color: #fff;
+      font-family: Georgia, serif;
+      font-size: clamp(24px, 5vw, 30px);
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .exit-title strong { color: #ff5962; }
+
+    .exit-description {
+      margin-bottom: 25px;
+      color: #ddd;
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .exit-continue {
+      display: block;
+      width: 100%;
+      min-height: 55px;
+      padding: 14px 16px;
+      background: #e62e3d;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(230, 46, 61, .25);
+    }
+
+    .exit-continue:hover { background: #fb3c4a; }
+    .exit-continue:focus-visible, .exit-leave:focus-visible {
+      outline: 3px solid #fff;
+      outline-offset: 3px;
+    }
+
+    .exit-leave {
+      display: block;
+      margin: 14px auto 0;
+      padding: 9px 12px;
+      background: transparent;
+      border: 0;
+      color: #bdbdbd;
+      cursor: pointer;
+      font-size: 13px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .exit-leave:hover { color: #fff; }
+
+    @media (max-width: 600px) {
+      .exit-dialog { padding: 31px 21px 23px; }
+      .exit-description { font-size: 15px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .exit-dialog { animation: none; }
+    }
   </style>
 
   <!-- =====================================================
@@ -283,6 +396,24 @@
     Todos los derechos reservados
   </footer>
 
+  <!-- Pop-up de intenção de saída, exibido somente antes de o vídeo terminar. -->
+  <div class="exit-overlay" id="exitPopup" aria-hidden="true">
+    <section class="exit-dialog" role="dialog" aria-modal="true" aria-labelledby="exitTitle" aria-describedby="exitDescription">
+      <span class="exit-kicker">Espera un momento</span>
+      <h2 class="exit-title" id="exitTitle">
+        ¿Y si el verdadero riesgo no fuera cumplir 40…
+        <strong>sino dejar que las dudas afecten tu relación?</strong>
+      </h2>
+      <p class="exit-description" id="exitDescription">
+        Hay cosas que muchos hombres prefieren callar.
+        Antes de irte, escucha la explicación completa y decide por ti mismo.
+      </p>
+      <button class="exit-continue" type="button" id="exitStay">Sí, quiero seguir viendo el video</button>
+      <button class="exit-leave" type="button" id="exitLeave">No, prefiero salir</button>
+    </section>
+  </div>
+
+
   <script>
     (function(){
       var count=285;
@@ -299,5 +430,123 @@
       setInterval(updateCounter,3000);
     })();
   </script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var modal = document.getElementById('exitPopup');
+      var stayButton = document.getElementById('exitStay');
+      var leaveButton = document.getElementById('exitLeave');
+      var player = document.getElementById('ab-6ae28ed4d653f6988a0dc7de');
+      var videoFinished = false;
+      var optedOut = false;
+      var guardArmed = false;
+      var sourceOfPopup = null;
+      var focusBeforePopup = null;
+
+      // A VTurb emite 'video:ended' quando o vídeo termina.
+      // Após a conclusão, este pop-up deixa de ser exibido.
+      if (player) {
+        player.addEventListener('video:ended', function () {
+          videoFinished = true;
+          if (modal.classList.contains('is-visible')) {
+            closePopup();
+          }
+        });
+      }
+
+      function openPopup(reason) {
+        if (videoFinished || optedOut || modal.classList.contains('is-visible')) return;
+        sourceOfPopup = reason;
+        focusBeforePopup = document.activeElement;
+        modal.classList.add('is-visible');
+        modal.setAttribute('aria-hidden', 'false');
+        stayButton.focus({ preventScroll: true });
+      }
+
+      function closePopup() {
+        modal.classList.remove('is-visible');
+        modal.setAttribute('aria-hidden', 'true');
+        if (focusBeforePopup && typeof focusBeforePopup.focus === 'function') {
+          focusBeforePopup.focus({ preventScroll: true });
+        }
+      }
+
+      function armBackGuard() {
+        if (guardArmed || optedOut || videoFinished) return;
+        try {
+          history.pushState({ vslExitGuard: true }, '', location.href);
+          guardArmed = true;
+        } catch (error) {
+          // Em navegadores que restringem o histórico, o pop-up no desktop continua ativo.
+        }
+      }
+
+      // Desktop: saída pela borda superior (intenção de fechar/voltar/trocar URL).
+      document.addEventListener('mouseout', function (event) {
+        if (!window.matchMedia('(pointer: fine)').matches) return;
+        if (!event.relatedTarget && event.clientY <= 12 && event.clientY >= 0) {
+          openPopup('mouse');
+        }
+      });
+
+      // Celular e desktop: tentativa de voltar na navegação.
+      window.addEventListener('popstate', function () {
+        if (!guardArmed) return;
+        guardArmed = false;
+        if (optedOut) return;
+        if (videoFinished) {
+          // Sem aviso após o final: libera a navegação normalmente.
+          optedOut = true;
+          history.back();
+          return;
+        }
+        openPopup('back');
+      });
+
+      stayButton.addEventListener('click', function () {
+        var fromBack = sourceOfPopup === 'back';
+        closePopup();
+        sourceOfPopup = null;
+        // Depois de optar por continuar, uma nova tentativa pode exibir novamente.
+        if (fromBack) armBackGuard();
+        if (player && typeof player.play === 'function') {
+          try { player.play(); } catch (error) { /* o botão do player continua disponível */ }
+        }
+      });
+
+      leaveButton.addEventListener('click', function () {
+        var fromBack = sourceOfPopup === 'back';
+        optedOut = true; // Respeita a escolha de sair, sem repetir o pop-up.
+        closePopup();
+        sourceOfPopup = null;
+        if (fromBack) {
+          history.back();
+        }
+        // No desktop, permite ao visitante fechar a aba ou sair normalmente.
+      });
+
+      // Escape permite dispensar sem prender o usuário.
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('is-visible')) {
+          leaveButton.click();
+        }
+        if (event.key === 'Tab' && modal.classList.contains('is-visible')) {
+          // Mantém o foco dentro do modal enquanto ele estiver aberto.
+          if (event.shiftKey && document.activeElement === stayButton) {
+            event.preventDefault();
+            leaveButton.focus();
+          } else if (!event.shiftKey && document.activeElement === leaveButton) {
+            event.preventDefault();
+            stayButton.focus();
+          }
+        }
+      });
+
+      armBackGuard();
+    })();
+  </script>
+
 </body>
 </html>
